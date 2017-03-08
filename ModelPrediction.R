@@ -16,10 +16,6 @@ Prediction.RuleBasedModel <- function(object, newdata){
 }
 
 predict.norm <- function(object, newdata, parallel = TRUE){
-  if (object$type.model == "TSK"){
-    object$num.labels = cbind(object$num.labels, object$num.labels[1,1])
-  }
-  
   ## get all of parameters
   range.output <- object$range.data.ori[, ncol(object$range.data.ori), drop = FALSE]
   num.varinput <- ncol(newdata)
