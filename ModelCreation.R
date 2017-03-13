@@ -1,20 +1,43 @@
-ModelCreation <- function(Dataset.train, range.data = NULL, model.type = 'WM', control = NULL, inputId, conn, Input_Discription = NULL){
+Train <- function(data, model.type, ...){
+  switch(model.type,
+         WM = Train.WM(data,model.type, ...))
+}
+
+Train.WM <- function(data, model.type = 'WM', range.data, num.labels, control = NULL){
+  data.norm <- norm.data(data, range.data, min.scale = 0, max.scale = 1)
+  if(length(num.labels) != ncol(data)){
+    num.labels <- rep_len(num.labels, ncol(data))
+  }
   
-  require(jsonlite)
-  source('~/FusionProject/R Code/FUSION_HyFIS/InsertDatabase.R')
-  source('~/FusionProject/R Code/FUSION_HyFIS/ModelTraining.R')
+  default.control <- list(num.labels = 10, type.mf = "GAUSSIAN", type.tnorm = "PRODUCT", type.snorm = "SUM", type.defuzz = "COG")
+  control <- MissingDataFilled(control, default.control)
   
-  jsonConfiguration <- serializeJSON(control)
+  type.mf <- control$type.mf
+  type.tnorm <- control$type.tnorm
+  type.snorm <- control$type.snorm
+  type.defuzz <- control$type.defuzz
   
-  Model_Discription <- model.type #readline(prompt = paste0("Enter ",model.type," model description:"))
-  model <- list(Type = model.type, Configuration = jsonConfiguration, Model_Discription = Model_Discription)
+  object <- WM(data.norm, num.labels, range.data)
   
-  object <- ModelTraining(Dataset.train, range.data, model.type, control)
+  fitted.norm <- predict.norm(object, data.norm[,-ncol(data.norm)])
+  fitted <- denorm.data(fitted.norm$predicted.val, range.data[,ncol(range.data)], min.scale = 0, max.scale = 1)
   
-  jsonObject <- serializeJSON(object)
+  object$fitted <- fitted
+  object$x <- data[,-ncol(data)]
+  object$y <- data[, ncol(data)]
   
-  Experiment_Reason <- sprintf("Using %s and %s to predict", model.type, Input_Discription)#readline(prompt = "Enter this experiment season:")
-  experiment <- list(Training_Parameters = jsonObject, Experiment_Reason = Experiment_Reason)
+  return(object)
+}
+
+MissingDataFilled <- function(control, default.control){
+  if(is.null(control))
+    control <- default.control
+  else{
+    for(iter in names(default.control)){
+      if(is.null(control[[iter]]))
+        control[[iter]] <- default.control[[iter]]
+    }
+  }
   
-  return(list(object = object, experiment = experiment, model = model, InputId = inputId))
+  return(control)
 }

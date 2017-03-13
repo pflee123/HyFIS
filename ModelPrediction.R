@@ -41,39 +41,21 @@ predict.norm <- function(object, newdata, parallel = TRUE){
   type.tnorm <- object$type.tnorm
   type.snorm <- object$type.snorm
   type.model <- object$type.model
-
   
-  ###################
-  ### I. Fuzzification Module
-  ### In this function, we convert crisp value into linguistic value based on the data and parameter of membership function.
-  ### There are several membership function can be used such as triangular, trapezoid, gaussian and logistic/sigmoid.
-  ###################
-  ### y2
-  
-  MF <- fuzzifier(newdata, num.input, num.labels.input, input_membership)
-  
-  ###################
-  ### II. Inference Module
-  ### In this function, we will calculate the confidence factor on antecedent for each rule. We use AND, OR, NOT operator. 
-  ###################
-  ### y3
+  MF <- layer2.operation(newdata, num.input, num.labels.input, input_membership)
   
   ncol.MF <- ncol(MF)
   colnames(MF) <- c(names.input)
   
-  miu.rule <- inference(MF, rule, names.input, type.tnorm, type.snorm)
-    
-  miu.rule.indx <- miu.rule$miu.rule.indx
-  miu.rule <- miu.rule$miu.rule
+  degree.rule <- layer3.operation(MF, rule, names.input, type.tnorm)
   
-  ###################
-  ### III. Defuzzification Module
-  ### In this function, we calculate and convert linguistic value back into crisp value. 
-  ###################
+  input.indx <- degree.rule$input.indx
+  degree.rule <- degree.rule$degree.rule
+  degree.output <- layer4.operation(rule, degree.rule, input.indx, type.snorm)
   
-  def <- defuzzifier(newdata, rule, object$degree.rule, range.output, names.fvaloutput, varout.mf, miu.rule, type.defuz, type.model, func.tsk)
+  output <- layer5.operation(degree.output, output_membership, defuzz.func = type.defuz)
   
-  res <- list(rule = rule, varinp.mf = varinp.mf, varout.mf = varout.mf, y2 = MF, y3 = miu.rule, y3.indx = miu.rule.indx, y4 = def$y4, func.tsk = func.tsk, predicted.val = def$y5)
+  res <- list(rule = rule, varinp.mf = input_membership, varout.mf = output_membership, y2 = MF, y3 = degree.rule, y4 = degree.output, predicted.val = output)
   
   return(res)
 }

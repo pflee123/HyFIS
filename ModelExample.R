@@ -4,12 +4,12 @@ data(frbsData)
 
 data.train <- frbsData$GasFurnance.dt
 
+colnames(data.train) <- c("V1","V2","Output")
+
 range <- apply(data.train, 2, range)
 
-data.norm <- norm.data(data.train, range)
+num.labels <- c(5,7,5)
 
-num.labels <- c(3,3,3)
+object <- Train(data.train, model.type = "WM", range.data = range, num.labels = num.labels)
 
-object <- WM(data.norm, num.labels, range)
-
-data.result <- denorm.data(data.norm, range.data = range)
+result <- Prediction(object, data.train[,-ncol(data.train)])

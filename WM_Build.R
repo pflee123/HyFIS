@@ -1,4 +1,4 @@
-WM <- function(data.train, num.labels, range.data.ori, type.mf = "GAUSSIAN", type.tnorm = "PRODUCT", type.snorm = "SUM", type.defuzz = "COG", type.implication.func = "ZADEH") {
+WM <- function(data.train, num.labels, range.data.ori, type.mf = "GAUSSIAN", type.tnorm = "PRODUCT", type.snorm = "SUM", type.defuzz = "COG") {
 
   range.data <- matrix(nrow = 2, ncol = ncol(data.train))
   range.data[1, ] <- 0
@@ -38,7 +38,7 @@ WM <- function(data.train, num.labels, range.data.ori, type.mf = "GAUSSIAN", typ
     }
   }
   
-  label_names <- c(sapply(1:ncol(data.train), function(x){
+  label_names <- unlist(sapply(1:ncol(data.train), function(x){
     paste(colnames(data.train)[x], 1:num.labels[x], sep = "_")
   }))
   
@@ -86,8 +86,9 @@ WM <- function(data.train, num.labels, range.data.ori, type.mf = "GAUSSIAN", typ
   # order by degree.rule
   temp <- temp[order(temp[,1], decreasing = TRUE),]
   
+  output.labels.indx <- index_cum[num.varinput] + 1:num.labels[num.varinput]
   ## find the same elements on matrix rule considering degree of rules
-  indx.nondup <- !duplicated(temp[,-1])
+  indx.nondup <- !duplicated(temp[,-c(1, 1+output.labels.indx)])
   rule.complete <- temp[indx.nondup, ,drop = FALSE]
   degree_rule <- rule.complete[, 1, drop = FALSE]
   rule <- rule.complete[, -1, drop = FALSE]
