@@ -17,28 +17,31 @@ Prediction.RuleBasedModel <- function(object, newdata){
 
 predict.norm <- function(object, newdata, parallel = TRUE){
   ## get all of parameters
-  range.output <- object$range.data.ori[, ncol(object$range.data.ori), drop = FALSE]
-  num.input <- ncol(newdata)
+  # range.output <- object$range.data.ori[, ncol(object$range.data.ori), drop = FALSE]
+  num.input <- object$input_num
+  num.output <- object$output_num
   
+  # number of labels for each variables
+  num.labels <- object$num.labels
+  num.labels.input <- num.labels[1:num.input]
+  num.labels.output <- num.labels[num.input+1:num.output]
+  cum.labels <- cumsum(num.labels)
+  
+  input_membership <- object$membership_function[,1:cum.labels[num.input]]
+  output_membership <- object$membership_function[,-c(1:cum.labels[num.input])]
   ## change linguistic terms/labels to be unique
   # temp <- ch.unique.fuzz(object$type.model, object$rule, object$varinp.mf, object$varout.mf,num.varinput, object$num.labels)
   
   rule <- object$rule
-  varinp.mf <- object$varinp.mf
-  varout.mf <- object$varout.mf	
-  names.fvalinput <- colnames(object$varinp.mf)#temp$names.fvalinput
-  names.fvaloutput <- colnames(object$varout.mf)#temp$names.fvaloutput
-  names.fvalues <- c(names.fvalinput,names.fvaloutput)#temp$names.fvalues
-  num.labels.input <- object$num.labels[, -ncol(object$num.labels), drop = FALSE]
+  names.input <- object$mf_label_name[1:cum.labels[num.input]]
+  names.output <- object$mf_label_name[-c(1:cum.labels[num.input])]
+  names.mf <- object$mf_label_name
+  
   type.defuz <- object$type.defuz
   type.tnorm <- object$type.tnorm
   type.snorm <- object$type.snorm
   type.model <- object$type.model
-  func.tsk <- object$func.tsk
-  if (object$method.type != "MANUAL"){
-    range.output[1, ] <- 0
-    range.output[2, ] <- 1	
-  }
+
   
   ###################
   ### I. Fuzzification Module
@@ -47,7 +50,7 @@ predict.norm <- function(object, newdata, parallel = TRUE){
   ###################
   ### y2
   
-  MF <- fuzzifier(newdata, num.varinput, num.labels.input, varinp.mf)
+  MF <- fuzzifier(newdata, num.input, num.labels.input, input_membership)
   
   ###################
   ### II. Inference Module
@@ -56,10 +59,9 @@ predict.norm <- function(object, newdata, parallel = TRUE){
   ### y3
   
   ncol.MF <- ncol(MF)
-  names.var <- names.fvalues[1 : ncol.MF]
-  colnames(MF) <- c(names.var)
+  colnames(MF) <- c(names.input)
   
-  miu.rule <- inference(MF, rule, names.fvalinput, type.tnorm, type.snorm)
+  miu.rule <- inference(MF, rule, names.input, type.tnorm, type.snorm)
     
   miu.rule.indx <- miu.rule$miu.rule.indx
   miu.rule <- miu.rule$miu.rule

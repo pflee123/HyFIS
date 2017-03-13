@@ -1,4 +1,4 @@
-WM <- function(data.train, num.labels, range.data.ori, type.mf = "GAUSSIAN", type.tnorm = "PRODUCT", type.implication.func = "ZADEH") {
+WM <- function(data.train, num.labels, range.data.ori, type.mf = "GAUSSIAN", type.tnorm = "PRODUCT", type.snorm = "SUM", type.defuzz = "COG", type.implication.func = "ZADEH") {
 
   range.data <- matrix(nrow = 2, ncol = ncol(data.train))
   range.data[1, ] <- 0
@@ -38,6 +38,11 @@ WM <- function(data.train, num.labels, range.data.ori, type.mf = "GAUSSIAN", typ
     }
   }
   
+  label_names <- c(sapply(1:ncol(data.train), function(x){
+    paste(colnames(data.train)[x], 1:num.labels[x], sep = "_")
+  }))
+  
+  colnames(input_mf) <- label_names
   ## Step 2: Generate Fuzzy Rules from Given Data Pairs. ####
   ## Step 2a: Determine the degree of data pairs.
   ## MF is matrix membership function. The dimension of MF is n x m, where n is number of data and m is num.labels * input variable (==ncol(var.mf))
@@ -45,9 +50,6 @@ WM <- function(data.train, num.labels, range.data.ori, type.mf = "GAUSSIAN", typ
   ## get degree of membership by fuzzification
   MF <- fuzzifier(data.train, num.varinput, num.labels, input_mf)
   
-  label_names <- c(sapply(1:ncol(data.train), function(x){
-    paste(colnames(data.train)[x], 1:num.labels[x], sep = "_")
-  }))
   colnames(MF) <- label_names
   
   ####get max value of degree on each variable to get one rule.
@@ -102,11 +104,18 @@ WM <- function(data.train, num.labels, range.data.ori, type.mf = "GAUSSIAN", typ
   seqq <- seq(1:ncol(rule))
   rule.num <- t(apply(rule, 1, function(x) x * seqq))
   
-  mod <- structure(list(num.labels = num.labels, rule = rule, rule.num = rule.num, membership_function = input_mf,
+  ## the number of labels
+  ## rule
+  ## membership functions
+  ## the number of input variables
+  ## the number of output varibales
+  ## range of original dataset
+  mod <- structure(list(model = "WM", num.labels = num.labels, rule = rule, rule.num = rule.num, 
+                        membership_function = input_mf, mf_label_name = colnames(input_mf),
                         input_num = num.varinput-1, input_name = colnames(data.train[,-num.varinput]),
                         output_num = 1, output_name = colnames(data.train[, num.varinput]),
                         range.data.ori = range.data.ori,
-                        degree.rule = degree_rule, type.mf = type.mf, type.tnorm = type.tnorm), class = "RuleBasedModel")
+                        degree.rule = degree_rule, type.mf = type.mf, type.tnorm = type.tnorm, type.snorm = type.snorm, type.defuzz = type.defuzz), class = "RuleBasedModel")
   
   return (mod)
 }

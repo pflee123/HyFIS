@@ -30,6 +30,9 @@ rulebase <- function(type.model, rule, func.tsk = NULL){
   return(rule)
 }
 
+#' @param num.varinput the number of dataset colunms
+#' @param num.labels.input a vector containing the number of each varible's labels
+# y2
 fuzzifier <- function(data, num.varinput, num.labels.input, varinp.mf){
   
   ##count number of column of data
@@ -79,153 +82,16 @@ fuzzifier <- function(data, num.varinput, num.labels.input, varinp.mf){
   
   return(MF)
 }
-
-fuzzifier.parallel <- function(data, num.varinput, num.labels.input, varinp.mf){
+# y3
+inference<-function(MF, rule, names.varinput, type.tnorm,...){
   
-  require(foreach)
-  require(doParallel)
-  require(doSNOW)
-  require(parallel)
-  
-  cl <- makePSOCKcluster(detectCores())
-  registerDoSNOW(cl)
-  ##count number of column of data
-  ncol.data <- ncol(data)
-  
-  ##count number of column of varinp.mf (matrix used to build membership function) 
-  ncol.var <- ncol(varinp.mf)
-  
-  ##Inisialitation matrix of Membership function
-  MF <- matrix(nrow = nrow(data), ncol = ncol.var)
-  VF <- matrix(nrow = 1, ncol = ncol.var)
-  
-  ##check 
-  if (ncol.data != num.varinput)
-    stop("Data is not the same as the number of input variables")
-  if (ncol.var != sum(num.labels.input))
-    stop("the parameter of membership function is not the same with variable")
-  
-  ##h is index equal to number of data
-  ##i is index for numbering variable
-  ##j is index equal to number of varinp.mf column
-  ##ii is used for counting how many iteration has been done in the following loop
-  ##jj is used for keeping the iteration continueing to next index in varinp.mf
-  
-  ##iterate as along number of data
-  MF <- foreach (h = 1 : nrow(data), .combine = rbind) %dopar%
-  {
-    jj <- 1
-    ##iterate for each crisp value on each data 
-    for (i in 1: ncol(data)){
-      
-      ##counter for break
-      ii <- 1
-      
-      ##loop all column on varinp.mf
-      for (j in jj : ncol(varinp.mf)){		
-        
-        ##
-        ##checking for type 1: Triangular, if varinp.mf[1,] == 1 
-        ##parameter=(a,b,c), where a < b < c
-        ##a=varinp.mf[2,]
-        ##b=varinp.mf[3,]
-        ##c=varinp.mf[4,]
-        if (varinp.mf[1, j] == 1){
-          if (data[h, i] <= varinp.mf[2, j]) temp <- 0
-          else if (data[h, i] <= varinp.mf[3, j]) temp <- (data[h, i] - varinp.mf[2, j]) / (varinp.mf[3, j] - varinp.mf[2, j])
-          else if (data[h, i] < varinp.mf[4, j]) temp <- (data[h, i] - varinp.mf[4, j]) / (varinp.mf[3, j] - varinp.mf[4, j])
-          else temp <- 0
-        }
-        
-        ##checking for type 2: Trapezoid_1a, if varinp.mf[1,] ==2
-        ##Trapezoid_1a is the edge on the left: vertical
-        ##parameter=(a,b,c)
-        ##a=varinp.mf[2,]
-        ##b=varinp.mf[3,]
-        ##c=varinp.mf[4,]
-        else if (varinp.mf[1, j] == 2){
-          if (data[h, i] <= varinp.mf[3, j]) temp <- 1
-          else if (data[h, i] <= varinp.mf[4, j]) temp <- (data[h, i] - varinp.mf[4, j]) / (varinp.mf[3, j] - varinp.mf[4, j])
-          else temp <- 0				
-        }
-        
-        ##checking for type 3: Trapezoid_1b, if varinp.mf[1,] == 3
-        ##Trapezoid_1b is the edge on the right: vertical
-        ##parameter=(a,b,c)
-        ##a=varinp.mf[2,]
-        ##b=varinp.mf[3,]
-        ##c=varinp.mf[4,]
-        else if (varinp.mf[1, j] == 3){
-          if (data[h, i] <= varinp.mf[2, j]) temp <- 0
-          else if (data[h, i] < varinp.mf[3, j]) temp <- (data[h, i] - varinp.mf[2, j]) / (varinp.mf[3, j] - varinp.mf[2, j])
-          else temp <- 1
-        }
-        
-        ##checking for type 4: Trapezoid_2
-        ##parameter=(a,b,c,d)
-        ##a=varinp.mf[2,]
-        ##b=varinp.mf[3,]
-        ##c=varinp.mf[4,]
-        ##d=varinp.mf[5,]
-        else if (varinp.mf[1, j] == 4){
-          if (data[h,i] <= varinp.mf[2, j] || data[h,i] > varinp.mf[5, j]) temp <- 0
-          else if (data[h, i] > varinp.mf[3, j] && data[h, i] <= varinp.mf[4, j]) temp <- 1
-          else if (data[h, i] > varinp.mf[2, j] && data[h, i] <= varinp.mf[3, j]) temp <- (data[h, i] - varinp.mf[2, j]) / (varinp.mf[3, j] - varinp.mf[2, j])
-          else if (data[h,i] > varinp.mf[4, j] && data[h,i] <= varinp.mf[5,j]) temp <- (data[h, i] - varinp.mf[5, j]) / (varinp.mf[4, j] - varinp.mf[5, j])
-        }
-        
-        ##checking for type 5: Gaussian
-        ##parameter=(mean a, standard deviation b)
-        ##a=varinp.mf[2,]
-        ##b=varinp.mf[3,]
-        else if (varinp.mf[1, j] == 5){
-          temp <- exp(- (data[h, i] - varinp.mf[2, j])^2 / varinp.mf[3, j]^2)
-        }
-        
-        ##checking for type 6: Sigmoid/logistic
-        ##parameter=(gamma,c)
-        ##gamma=varinp.mf[2,]
-        ##c=varinp.mf[3,]
-        else if (varinp.mf[1, j] == 6) {
-          temp <- 1/(1 + exp(- varinp.mf[2, j] * (data[h, i] - varinp.mf[3, j])))
-        }
-        
-        ##checking for type 7: Generalized Bell
-        ##parameter=(a,b,c)
-        ##a=varinp.mf[2,]
-        ##b=varinp.mf[3,]
-        ##c=varinp.mf[4,]
-        else if (varinp.mf[1, j] == 7) {
-          temp <- 1/(1 + abs((data[h, i] - varinp.mf[4, j])/varinp.mf[2, j]) ^ (2 * varinp.mf[3, j]))   
-        }
-        
-        ##save membership function on MF for each data		
-        VF[, j] <- temp
-        
-        ii <- ii + 1
-        jj <- jj + 1
-        ##this checking is used for control the number of linguistic value for each variable
-        
-        if (ii > num.labels.input[1, i])
-          break
-        
-      }
-    }
-    
-    VF
-  }
-  
-  stopCluster(cl)
-  return(MF)
-}
-
-inference<-function(MF, rule, names.varinput, type.tnorm, type.snorm){
-  
-  ##calculate number of data
+  ##number of dataset rows
   nMF <- nrow(MF)
+  num.input <- ncol(MF)
   
-  ##calculate number of rule
+  ##the number of rules
   nrule <- nrow(rule)
+  
   
   ##allocate memory for membership function on antecedent
   miu.rule <- matrix(nrow = nMF, ncol = nrule)
@@ -235,113 +101,8 @@ inference<-function(MF, rule, names.varinput, type.tnorm, type.snorm){
   colnames(MF) <- c(names.varinput)
   
   ##Iteration for n data
-  for(k in 1 : nMF){
-    ##Iteration for each rule
-    for(i in 1 : nrule){
-      
-      ##change list of rule into matrix
-      temp <- rule[i,]
-      
-      ##detect location of "->" sign as separation between antecedent and consequence
-      loc <- which(temp == "->")
-      
-      ##Inisialization for calculating MF of antecendet
-      val.antecedent <- MF[k, temp[1]]
-      min.indx <- temp[1]
-      ## iterate to calculate degree of MF until find "->" sign (equals to loc)
-      seqq <- seq(from = 1, to = loc, by = 2)
-      for (j in seqq) {
-        
-        if (j == loc - 1)
-          break
-        
-        val.antecedent.b <- MF[k, temp[j + 2]]
-        ##condition for conjunction operator (AND)
-        if ((temp[j + 1] == "1") || (temp[j + 1] == "and")){
-          ##condition for type.tnorm used is standard type(min)
-          if (type.tnorm == 1 || type.tnorm == "MIN"){
-            if (!is.na(val.antecedent.b) && val.antecedent.b < val.antecedent){
-              val.antecedent <- val.antecedent.b
-              min.indx <- temp[j + 2]
-            }
-          }
-          ##condition for type.tnorm used is Hamacher product
-          else if (type.tnorm == 2 || type.tnorm == "HAMACHER") {									
-            val.antecedent <- (val.antecedent * val.antecedent.b) / (val.antecedent + val.antecedent.b - val.antecedent * val.antecedent.b)
-          }
-          
-          ##condition for type.tnorm used is yager class (with tao = 1)
-          else if (type.tnorm == 3 || type.tnorm == "YAGER") {										
-            temp.val.ante <- (1 - val.antecedent) + (1 - val.antecedent.b)
-            if (temp.val.ante <= 1){
-              val.antecedent <- temp.val.ante
-            } else {
-              val.antecedent <- 1
-            }
-          }
-          
-          ##condition for type.tnorm used is product
-          else if (type.tnorm == 4 || type.tnorm == "PRODUCT") {				
-            val.antecedent <- val.antecedent * val.antecedent.b
-          }
-          
-          ##condition for type.tnorm used is bounded product
-          else if (type.tnorm == 5 || type.tnorm == "BOUNDED"){
-            temp.val.ante <- (val.antecedent * val.antecedent.b - 1)
-            if (temp.val.ante > 0){
-              val.antecedent <- temp.val.ante
-            } else {
-              val.antecedent <- 0
-            }
-          }
-        }
-        
-        ##condition for disjunction operator (OR)
-        else if ((temp[j + 1] == "2") || (temp[j + 1] == "or")){
-          ##condition for type.snorm used is standard type (max)
-          if (type.snorm == 1 || type.snorm == "MAX"){						
-            if (val.antecedent.b > val.antecedent)
-              val.antecedent <- val.antecedent.b
-          }
-          
-          ##condition for type.snorm used is Hamacher sum
-          else if (type.snorm == 2 || type.snorm == "HAMACHER") {							
-            val.antecedent <- (val.antecedent + val.antecedent.b - 2 * val.antecedent * val.antecedent.b) / (1 - val.antecedent * val.antecedent.b)
-          }
-          
-          ##condition for type.snorm used is yager class (with tao = 1)
-          else if (type.snorm == 3 || type.snorm == "YAGER"){							
-            temp.val.ante <- (val.antecedent + val.antecedent.b)
-            if (temp.val.ante <= 1){
-              val.antecedent <- temp.val.ante
-            } else {
-              val.antecedent <- 1						
-            }
-          }
-          
-          ##condition for type.snorm used is sum
-          else if (type.snorm == 4 || type.snorm == "SUM"){
-            val.antecedent <- (val.antecedent + val.antecedent.b - val.antecedent * val.antecedent.b)
-          }
-          
-          ##condition for type.snorm used is bounded sum
-          else if (type.snorm == 5 || type.snorm == "BOUNDED"){
-            temp.val.ante <- (val.antecedent + val.antecedent.b)
-            if (temp.val.ante <= 1){
-              val.antecedent <- temp.val.ante
-            } else {
-              val.antecedent <- 1					
-            }
-          }				
-        }
-        
-      }
-      
-      ##save value of MF on each rule			
-      miu.rule[k, i] <- c(val.antecedent)		
-      miu.rule.indx[k, i] <- min.indx
-    }	
-  }
+  rule.antecede <- rule[,1:num.input]
+  sweep(rule.antecede,2,MF[1,],`*`)
   ## result 
   ## number of row is based on number of data.
   ## number of column is based on number of rule.
@@ -486,6 +247,7 @@ inference.parallel<-function(MF, rule, names.varinput, type.tnorm, type.snorm){
   return(miu.rule)
 }
 
+# y4
 defuzzifier <- function(data, rule = NULL, degree.rule, range.output = NULL, names.varoutput = NULL, varout.mf = NULL, miu.rule, type.defuz = NULL, type.model = "TSK", func.tsk = NULL){
   
   ## Inisialitation
@@ -1223,6 +985,7 @@ defuzzifier.parallel <- function(data, rule = NULL, degree.rule, range.output = 
   return(list(y5 = def, y4 = y4.matrix))
 }
 
+# y5
 ch.unique.fuzz <- function(type.model, rule, varinp.mf, varout.mf = NULL, num.varinput, num.labels){	
   num.labels.input <- num.labels[, -ncol(num.labels), drop = FALSE]	
   
