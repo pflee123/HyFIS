@@ -1,76 +1,85 @@
-InitializeNeuralNetwork <- function (data, model.list, hidden, act.fct, err.fct, algorithm, linear.output, formula) 
-  {
-    formula.reverse <- formula
-    formula.reverse[[2]] <- stats::as.formula(paste(model.list$response[[1]], 
-                                                    "~", model.list$variables[[1]], sep = ""))[[2]]
-    formula.reverse[[3]] <- formula[[2]]
-    response <- as.matrix(stats::model.frame(formula.reverse, data))
-    formula.reverse[[3]] <- formula[[3]]
-    covariate <- as.matrix(stats::model.frame(formula.reverse, data))
-    covariate[, 1] <- 1
-    colnames(covariate)[1] <- "intercept"
-    if (is.function(act.fct)) {
-      act.deriv.fct <- differentiate(act.fct)
-      attr(act.fct, "type") <- "function"
+InitializeFunction <- function (act.fct, err.fct, layer.num) {
+    
+  act.fct.layer <- list()
+  indx <- 1
+  for(act.fct.indx in act.fct){
+    if(act.fct.indx == "tanh"){
+      act.fct.indx <- function(x){
+        tanh(x)
+      }
     }
-    else {
-      if (act.fct == "tanh") {
-        act.fct <- function(x) {
-          tanh(x)
-        }
-        attr(act.fct, "type") <- "tanh"
-        act.deriv.fct <- function(x) {
-          1 - x^2
-        }
+    if(act.fct.indx == "logistic"){
+      act.fct.indx <- function(x){
+        1/(1 + exp(-x))
       }
-      else if (act.fct == "logistic") {
-        act.fct <- function(x) {
-          1/(1 + exp(-x))
-        }
-        attr(act.fct, "type") <- "logistic"
-        act.deriv.fct <- function(x) {
-          x * (1 - x)
-        }
-      }
+    }
+    if (is.function(act.fct.indx)) {
+      act.fct.indx <- differentiate(act.fct.indx)
+      attr(act.fct.indx, "type") <- "activation"
     }
     
-    if (is.function(err.fct)) {
-      err.deriv.fct <- differentiate(err.fct)
-      attr(err.fct, "type") <- "function"
-    }
-    else {
-      if (err.fct == "ce") {
-        if (all(response == 0 | response == 1)) {
-          err.fct <- function(x, y) {
-            -(y * log(x) + (1 - y) * log(1 - x))
-          }
-          attr(err.fct, "type") <- "ce"
-          err.deriv.fct <- function(x, y) {
-            (1 - y)/(1 - x) - y/x
-          }
-        }
-        else {
-          err.fct <- function(x, y) {
-            1/2 * (y - x)^2
-          }
-          attr(err.fct, "type") <- "sse"
-          err.deriv.fct <- function(x, y) {
-            x - y
-          }
-          warning("'err.fct' was automatically set to sum of squared error (sse), because the response is not binary", 
-                  call. = F)
-        }
-      }
-      else if (err.fct == "sse") {
-        err.fct <- function(x, y) {
-          1/2 * (y - x)^2
-        }
-        attr(err.fct, "type") <- "sse"
-        err.deriv.fct <- function(x, y) {
-          x - y
-        }
-      }
-    }
-    return(list(covariate = covariate, response = response, err.fct = err.fct, 
-                err.deriv.fct = err.deriv.fct, act.fct = act.fct, act.deriv.fct = act.deriv.fct))
+    act.fct.layer[[indx]] <- act.fct.indx
+    indx <- indx + 1
   }
+  if(err.fct == "sse"){
+    err.fct <- function(x, y){
+      1/2 * (y - x)^2
+    }
+  }
+  if (is.function(err.fct)) {
+    err.fct <- differentiate(err.fct)
+    attr(err.fct, "type") <- "metric"
+  }
+  
+  act.fct <- rep_len(act.fct.layer, length.out = length(layer.num)-2)
+  return(list(err.fct = err.fct, act.fct = act.fct))
+}
+
+#' @param exclude triple element{layer.num, row.num(from), col.num(to)}
+StartWeightsGenernalization <- function (model.list, hidden, startweights, range.initial, exclude, constant.weights) {
+  
+  input.count <- length(model.list$variables)
+  output.count <- length(model.list$response)
+  
+  hidden.count <- hidden[hidden != 0]
+  
+  layer.num <- c(input.count, hidden.count, output.count)
+  if(is.null(startweights))
+    weights <- list()
+  else
+    weights <- startweights
+  for(indx in 1:(length(layer.num)-1)){
+    if(indx > length(weights)|| is.null(weights[[indx]])){
+      from <- layer.num[indx]
+      to <- layer.num[indx + 1]
+      weights.vector <- runif(from * to, -range.initial, range.initial)
+      weights.indx <- matrix(weights.vector, nrow = from, ncol = to)
+      weights[[indx]] <- weights.indx
+    }
+  }
+  
+  if(!is.null(exclude)){
+    apply(exclude, 2, function(x){
+      weights[[x[1]]][x[2],x[3]] <<- NA
+    })
+  }
+  
+  return(weights)
+}
+
+NeuralNetwork <- function(data, call, layer.num, weights, model.list, err.fct, act.fct, exclude){
+  neurons <- list()
+  for(indx in 1:length(layer.num)){
+    neurons[[indx]] <- matrix(0, ncol = layer.num[indx])
+  }
+  
+  structure(list(data = data,
+                 call = call,
+                 layer.num = layer.num,
+                 weights = weights,
+                 neurons = neurons,
+                 model.list = model.list,
+                 err.fct = err.fct,
+                 act.fct = act.fct,
+                 exclude = exclude), class = "NeuralNetwork")
+}

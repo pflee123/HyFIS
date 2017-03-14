@@ -4,7 +4,7 @@ neuralnet <- function (formula, data, hidden = 1, threshold = 0.01, stepmax = 1e
             learningrate.factor = list(minus = 0.5, plus = 1.2), learningrate = NULL, 
             lifesign = "none", lifesign.step = 1000, algorithm = "rprop+", 
             err.fct = "sse", act.fct = "logistic", linear.output = TRUE, 
-            exclude = NULL, constant.weights = NULL, likelihood = FALSE) 
+            exclude = NULL, constant.weights = NULL, likelihood = FALSE, range.initial = 0.7) 
   {
     call <- match.call()
     result <- varify.variables(data, formula, startweights, learningrate.limit, 
@@ -27,54 +27,54 @@ neuralnet <- function (formula, data, hidden = 1, threshold = 0.01, stepmax = 1e
     model.list <- result$model.list
     matrix <- NULL
     list.result <- NULL
-    result <- generate.initial.variables(data, model.list, hidden, 
-                                         act.fct, err.fct, algorithm, linear.output, formula)
-    covariate <- result$covariate
-    response <- result$response
+    
+    hidden <- hidden[hidden != 0]
+    layer.num <- c(length(model.list$variables),hidden ,length(model.list$response))
+    
+    result <- InitializeFunction(act.fct, err.fct, layer.num)
+
     err.fct <- result$err.fct
-    err.deriv.fct <- result$err.deriv.fct
     act.fct <- result$act.fct
-    act.deriv.fct <- result$act.deriv.fct
-    for (i in 1:rep) {
-      if (lifesign != "none") {
-        lifesign <- display(hidden, threshold, rep, i, lifesign)
-      }
-      utils::flush.console()
-      result <- calculate.neuralnet(learningrate.limit = learningrate.limit, 
-                                    learningrate.factor = learningrate.factor, covariate = covariate, 
-                                    response = response, data = data, model.list = model.list, 
-                                    threshold = threshold, lifesign.step = lifesign.step, 
-                                    stepmax = stepmax, hidden = hidden, lifesign = lifesign, 
-                                    startweights = startweights, algorithm = algorithm, 
-                                    err.fct = err.fct, err.deriv.fct = err.deriv.fct, 
-                                    act.fct = act.fct, act.deriv.fct = act.deriv.fct, 
-                                    rep = i, linear.output = linear.output, exclude = exclude, 
-                                    constant.weights = constant.weights, likelihood = likelihood, 
-                                    learningrate.bp = learningrate.bp)
-      if (!is.null(result$output.vector)) {
-        list.result <- c(list.result, list(result))
-        matrix <- cbind(matrix, result$output.vector)
-      }
-    }
-    utils::flush.console()
-    if (!is.null(matrix)) {
-      weight.count <- length(unlist(list.result[[1]]$weights)) - 
-        length(exclude) + length(constant.weights) - sum(constant.weights == 
-                                                           0)
-      if (!is.null(startweights) && length(startweights) < 
-          (rep * weight.count)) {
-        warning("some weights were randomly generated, because 'startweights' did not contain enough values", 
-                call. = F)
-      }
-      ncol.matrix <- ncol(matrix)
-    }
-    else ncol.matrix <- 0
-    if (ncol.matrix < rep) 
-      warning(sprintf("algorithm did not converge in %s of %s repetition(s) within the stepmax", 
-                      (rep - ncol.matrix), rep), call. = FALSE)
-    nn <- generate.output(covariate, call, rep, threshold, matrix, 
-                          startweights, model.list, response, err.fct, act.fct, 
-                          data, list.result, linear.output, exclude)
+    
+    weights <- StartWeightsGenernalization(model.list, hidden, startweights, range.initial, exclude, constant.weights)
+    
+    nn <- NeuralNetwork(data, call, layer.num, weights, model.list, err.fct, act.fct, exclude)
+    
+    result <- Prediction(nn, data[,-ncol(data)])
+    
+    nn <- result$object
+    
+    # result <- result$result
+    # result <- calculate.neuralnet(learningrate.limit = learningrate.limit, 
+    #                               learningrate.factor = learningrate.factor, covariate = covariate, 
+    #                               response = response, data = data, model.list = model.list, 
+    #                               threshold = threshold, lifesign.step = lifesign.step, 
+    #                               stepmax = stepmax, hidden = hidden, lifesign = lifesign, 
+    #                               startweights = startweights, algorithm = algorithm, 
+    #                               err.fct = err.fct, err.deriv.fct = err.deriv.fct, 
+    #                               act.fct = act.fct, act.deriv.fct = act.deriv.fct, 
+    #                               rep = i, linear.output = linear.output, exclude = exclude, 
+    #                               constant.weights = constant.weights, likelihood = likelihood, 
+    #                               learningrate.bp = learningrate.bp)
+    # 
+    # if (!is.null(matrix)) {
+    #   weight.count <- length(unlist(list.result[[1]]$weights)) - 
+    #     length(exclude) + length(constant.weights) - sum(constant.weights == 
+    #                                                        0)
+    #   if (!is.null(startweights) && length(startweights) < 
+    #       (rep * weight.count)) {
+    #     warning("some weights were randomly generated, because 'startweights' did not contain enough values", 
+    #             call. = F)
+    #   }
+    #   ncol.matrix <- ncol(matrix)
+    # }
+    # else ncol.matrix <- 0
+    # if (ncol.matrix < rep) 
+    #   warning(sprintf("algorithm did not converge in %s of %s repetition(s) within the stepmax", 
+    #                   (rep - ncol.matrix), rep), call. = FALSE)
+    # nn <- generate.output(covariate, call, rep, threshold, matrix, 
+    #                       startweights, model.list, response, err.fct, act.fct, 
+    #                       data, list.result, linear.output, exclude)
     return(nn)
   }
 
@@ -196,85 +196,9 @@ varify.variables <-
                 hidden = hidden, rep = rep, stepmax = stepmax, model.list = model.list))
   }
 
-generate.initial.variables <-
-  function (data, model.list, hidden, act.fct, err.fct, algorithm, 
-            linear.output, formula) 
-  {
-    formula.reverse <- formula
-    formula.reverse[[2]] <- stats::as.formula(paste(model.list$response[[1]], 
-                                                    "~", model.list$variables[[1]], sep = ""))[[2]]
-    formula.reverse[[3]] <- formula[[2]]
-    response <- as.matrix(stats::model.frame(formula.reverse, data))
-    formula.reverse[[3]] <- formula[[3]]
-    covariate <- as.matrix(stats::model.frame(formula.reverse, data))
-    covariate[, 1] <- 1
-    colnames(covariate)[1] <- "intercept"
-    if (is.function(act.fct)) {
-      act.deriv.fct <- differentiate(act.fct)
-      attr(act.fct, "type") <- "function"
-    }
-    else {
-      if (act.fct == "tanh") {
-        act.fct <- function(x) {
-          tanh(x)
-        }
-        attr(act.fct, "type") <- "tanh"
-        act.deriv.fct <- function(x) {
-          1 - x^2
-        }
-      }
-      else if (act.fct == "logistic") {
-        act.fct <- function(x) {
-          1/(1 + exp(-x))
-        }
-        attr(act.fct, "type") <- "logistic"
-        act.deriv.fct <- function(x) {
-          x * (1 - x)
-        }
-      }
-    }
-    if (is.function(err.fct)) {
-      err.deriv.fct <- differentiate(err.fct)
-      attr(err.fct, "type") <- "function"
-    }
-    else {
-      if (err.fct == "ce") {
-        if (all(response == 0 | response == 1)) {
-          err.fct <- function(x, y) {
-            -(y * log(x) + (1 - y) * log(1 - x))
-          }
-          attr(err.fct, "type") <- "ce"
-          err.deriv.fct <- function(x, y) {
-            (1 - y)/(1 - x) - y/x
-          }
-        }
-        else {
-          err.fct <- function(x, y) {
-            1/2 * (y - x)^2
-          }
-          attr(err.fct, "type") <- "sse"
-          err.deriv.fct <- function(x, y) {
-            x - y
-          }
-          warning("'err.fct' was automatically set to sum of squared error (sse), because the response is not binary", 
-                  call. = F)
-        }
-      }
-      else if (err.fct == "sse") {
-        err.fct <- function(x, y) {
-          1/2 * (y - x)^2
-        }
-        attr(err.fct, "type") <- "sse"
-        err.deriv.fct <- function(x, y) {
-          x - y
-        }
-      }
-    }
-    return(list(covariate = covariate, response = response, err.fct = err.fct, 
-                err.deriv.fct = err.deriv.fct, act.fct = act.fct, act.deriv.fct = act.deriv.fct))
-  }
-differentiate <- function (orig.fct, hessian = FALSE) 
-{
+
+differentiate <- function (orig.fct, hessian = FALSE) {
+  
   if(!is.function(orig.fct)){
     stop("given activation function is not a function")
   }
@@ -286,10 +210,12 @@ differentiate <- function (orig.fct, hessian = FALSE)
   args <- methods::formalArgs(orig.fct)
   temp <- stats::deriv(parse(text = body.fct), args, hessian = hessian)
   
-  func <- paste("function(",args,"){",deparse(temp),"}",collapse = "")
-  derivative <- eval(func)
+  func <- paste("function(",paste(args, collapse = ','),"){eval(expression(",temp,"))}", sep = '')
+  derivative <- eval(parse(text = func))
+  
   return(derivative)
 }
+
 display <-
   function (hidden, threshold, rep, i.rep, lifesign) 
   {
@@ -303,6 +229,7 @@ display <-
       2 + max(nchar(threshold)) + 2 * nchar(rep) + 41
     return(lifesign)
   }
+
 calculate.neuralnet <-
   function (data, model.list, hidden, stepmax, rep, threshold, 
             learningrate.limit, learningrate.factor, lifesign, covariate, 
@@ -311,10 +238,9 @@ calculate.neuralnet <-
             exclude, constant.weights, learningrate.bp) 
   {
     time.start.local <- Sys.time()
-    result <- generate.startweights(model.list, hidden, startweights, 
+    weights <- StartWeightsGenernalization(model.list, hidden, startweights, 
                                     rep, exclude, constant.weights)
-    weights <- result$weights
-    exclude <- result$exclude
+    
     nrow.weights <- sapply(weights, nrow)
     ncol.weights <- sapply(weights, ncol)
     result <- rprop(weights = weights, threshold = threshold, 
@@ -394,93 +320,8 @@ calculate.neuralnet <-
                 startweights = startweights, net.result = result$net.result, 
                 output.vector = output.vector))
   }
-generate.startweights <-
-  function (model.list, hidden, startweights, rep, exclude, constant.weights) 
-  {
-    input.count <- length(model.list$variables)
-    output.count <- length(model.list$response)
-    if (!(length(hidden) == 1 && hidden == 0)) {
-      length.weights <- length(hidden) + 1
-      nrow.weights <- array(0, dim = c(length.weights))
-      ncol.weights <- array(0, dim = c(length.weights))
-      nrow.weights[1] <- (input.count + 1)
-      ncol.weights[1] <- hidden[1]
-      if (length(hidden) > 1) 
-        for (i in 2:length(hidden)) {
-          nrow.weights[i] <- hidden[i - 1] + 1
-          ncol.weights[i] <- hidden[i]
-        }
-      nrow.weights[length.weights] <- hidden[length.weights - 
-                                               1] + 1
-      ncol.weights[length.weights] <- output.count
-    }
-    else {
-      length.weights <- 1
-      nrow.weights <- array((input.count + 1), dim = c(1))
-      ncol.weights <- array(output.count, dim = c(1))
-    }
-    length <- sum(ncol.weights * nrow.weights)
-    vector <- rep(0, length)
-    if (!is.null(exclude)) {
-      if (is.matrix(exclude)) {
-        exclude <- matrix(as.integer(exclude), ncol = ncol(exclude), 
-                          nrow = nrow(exclude))
-        if (nrow(exclude) >= length || ncol(exclude) != 3) 
-          stop("'exclude' has wrong dimensions", call. = FALSE)
-        if (any(exclude < 1)) 
-          stop("'exclude' contains at least one invalid weight", 
-               call. = FALSE)
-        temp <- relist(vector, nrow.weights, ncol.weights)
-        for (i in 1:nrow(exclude)) {
-          if (exclude[i, 1] > length.weights || exclude[i, 
-                                                        2] > nrow.weights[exclude[i, 1]] || exclude[i, 
-                                                                                                    3] > ncol.weights[exclude[i, 1]]) 
-            stop("'exclude' contains at least one invalid weight", 
-                 call. = FALSE)
-          temp[[exclude[i, 1]]][exclude[i, 2], exclude[i, 
-                                                       3]] <- 1
-        }
-        exclude <- which(unlist(temp) == 1)
-      }
-      else if (is.vector(exclude)) {
-        exclude <- as.integer(exclude)
-        if (max(exclude) > length || min(exclude) < 1) {
-          stop("'exclude' contains at least one invalid weight", 
-               call. = FALSE)
-        }
-      }
-      else {
-        stop("'exclude' must be a vector or matrix", call. = FALSE)
-      }
-      if (length(exclude) >= length) 
-        stop("all weights are exluded", call. = FALSE)
-    }
-    length <- length - length(exclude)
-    if (!is.null(exclude)) {
-      if (is.null(startweights) || length(startweights) < (length * 
-                                                           rep)) 
-        vector[-exclude] <- stats::rnorm(length)
-      else vector[-exclude] <- startweights[((rep - 1) * length + 
-                                               1):(length * rep)]
-    }
-    else {
-      if (is.null(startweights) || length(startweights) < (length * 
-                                                           rep)) 
-        vector <- stats::rnorm(length)
-      else vector <- startweights[((rep - 1) * length + 1):(length * 
-                                                              rep)]
-    }
-    if (!is.null(exclude) && !is.null(constant.weights)) {
-      if (length(exclude) < length(constant.weights)) 
-        stop("constant.weights contains more weights than exclude", 
-             call. = FALSE)
-      else vector[exclude[1:length(constant.weights)]] <- constant.weights
-    }
-    weights <- relist(vector, nrow.weights, ncol.weights)
-    return(list(weights = weights, exclude = exclude))
-  }
-rprop <-
-  function (weights, response, covariate, threshold, learningrate.limit, 
+
+rprop <- function (weights, response, covariate, threshold, learningrate.limit, 
             learningrate.factor, stepmax, lifesign, lifesign.step, act.fct, 
             act.deriv.fct, err.fct, err.deriv.fct, algorithm, linear.output, 
             exclude, learningrate.bp) 
@@ -570,6 +411,7 @@ rprop <-
     return(list(weights = weights, step = as.integer(step), reached.threshold = reached.threshold, 
                 net.result = result$net.result, neuron.deriv = result$neuron.deriv))
   }
+
 compute.net <-
   function (weights, length.weights, covariate, act.fct, act.deriv.fct, 
             output.act.fct, output.act.deriv.fct, special) 
@@ -597,6 +439,7 @@ compute.net <-
            call. = FALSE)
     list(neurons = neurons, neuron.deriv = neuron.deriv, net.result = net.result)
   }
+
 calculate.gradients <-
   function (weights, length.weights, neurons, neuron.deriv, err.deriv, 
             exclude, linear.output) 
