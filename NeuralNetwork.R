@@ -31,6 +31,8 @@ neuralnet <- function (formula, data, hidden = 1, threshold = 0.01, stepmax = 1e
     hidden <- hidden[hidden != 0]
     layer.num <- c(length(model.list$variables),hidden ,length(model.list$response))
     
+    bias <- rep(1, length(layer.num)-1)
+    learningrate <- 0.7
     result <- InitializeFunction(act.fct, err.fct, layer.num)
 
     err.fct <- result$err.fct
@@ -38,23 +40,23 @@ neuralnet <- function (formula, data, hidden = 1, threshold = 0.01, stepmax = 1e
     
     weights <- StartWeightsGenernalization(model.list, hidden, startweights, range.initial, exclude, constant.weights)
     
-    nn <- NeuralNetwork(data, call, layer.num, weights, model.list, err.fct, act.fct, exclude)
+    nn <- NeuralNetwork(data, call, layer.num, weights, bias, model.list, err.fct, act.fct, exclude, learningrate)
     
     result <- Prediction(nn, data[,-ncol(data)])
     
     nn <- result$object
     
     # result <- result$result
-    # result <- calculate.neuralnet(learningrate.limit = learningrate.limit, 
-    #                               learningrate.factor = learningrate.factor, covariate = covariate, 
-    #                               response = response, data = data, model.list = model.list, 
-    #                               threshold = threshold, lifesign.step = lifesign.step, 
-    #                               stepmax = stepmax, hidden = hidden, lifesign = lifesign, 
-    #                               startweights = startweights, algorithm = algorithm, 
-    #                               err.fct = err.fct, err.deriv.fct = err.deriv.fct, 
-    #                               act.fct = act.fct, act.deriv.fct = act.deriv.fct, 
-    #                               rep = i, linear.output = linear.output, exclude = exclude, 
-    #                               constant.weights = constant.weights, likelihood = likelihood, 
+    # result <- calculate.neuralnet(learningrate.limit = learningrate.limit,
+    #                               learningrate.factor = learningrate.factor, covariate = data[,-ncol(data)],
+    #                               response = data[,ncol(data)], data = data, model.list = model.list,
+    #                               threshold = threshold, lifesign.step = lifesign.step,
+    #                               stepmax = stepmax, hidden = hidden, lifesign = lifesign,
+    #                               startweights = startweights, algorithm = algorithm,
+    #                               err.fct = err.fct, err.deriv.fct = err.deriv.fct,
+    #                               act.fct = act.fct, act.deriv.fct = act.deriv.fct,
+    #                               rep = i, linear.output = linear.output, exclude = exclude,
+    #                               constant.weights = constant.weights, likelihood = likelihood,
     #                               learningrate.bp = learningrate.bp)
     # 
     # if (!is.null(matrix)) {
@@ -239,7 +241,7 @@ calculate.neuralnet <-
   {
     time.start.local <- Sys.time()
     weights <- StartWeightsGenernalization(model.list, hidden, startweights, 
-                                    rep, exclude, constant.weights)
+                                    1, exclude, constant.weights)
     
     nrow.weights <- sapply(weights, nrow)
     ncol.weights <- sapply(weights, ncol)
@@ -336,9 +338,7 @@ rprop <- function (weights, response, covariate, threshold, learningrate.limit,
     gradients.old <- as.vector(matrix(0, nrow = 1, ncol = length.unlist))
     if (is.null(exclude)) 
       exclude <- length(unlist(weights)) + 1
-    if (type(act.fct) == "tanh" || type(act.fct) == "logistic") 
-      special <- TRUE
-    else special <- FALSE
+    special <- FALSE
     if (linear.output) {
       output.act.fct <- function(x) {
         x
@@ -453,8 +453,7 @@ calculate.gradients <-
     gradients <- crossprod(neurons[[length.weights]], delta)
     if (length.weights > 1) 
       for (w in (length.weights - 1):1) {
-        delta <- neuron.deriv[[w]] * tcrossprod(delta, remove.intercept(weights[[w + 
-                                                                                   1]]))
+        delta <- neuron.deriv[[w]] * tcrossprod(delta, remove.intercept(weights[[w + 1]]))
         gradients <- c(crossprod(neurons[[w]], delta), gradients)
       }
     gradients[-exclude]
