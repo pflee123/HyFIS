@@ -40,13 +40,24 @@ neuralnet <- function (formula, data, hidden = 1, threshold = 0.01, stepmax = 1e
     
     weights <- StartWeightsGenernalization(model.list, hidden, startweights, range.initial, exclude, constant.weights)
     
-    nn <- NeuralNetwork(data, call, layer.num, weights, bias, model.list, err.fct, act.fct, exclude, learningrate)
+    object <- NeuralNetwork(data, call, layer.num, weights, bias, model.list, err.fct, act.fct, exclude, learningrate)
     
-    result <- Prediction(nn, data[,-ncol(data)])
-    
-    nn <- result$object
-    
-    # result <- result$result
+    rmse.old <- 10000
+    for(stemp in 1:stepmax){
+      result <- Prediction(object, data[,-ncol(data)])
+      
+      object <- result$object
+      result <- result$result
+      
+      rmse <- sqrt(mean(2*object$metric))
+      
+      if(threshold >= rmse || abs(rmse - rmse.old) <= 0.0001)
+        break
+      object <- GradientCalculation(object)
+      object <- Backpropagation(object)
+      
+      rmse.old <- rmse
+    }
     # result <- calculate.neuralnet(learningrate.limit = learningrate.limit,
     #                               learningrate.factor = learningrate.factor, covariate = data[,-ncol(data)],
     #                               response = data[,ncol(data)], data = data, model.list = model.list,

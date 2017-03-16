@@ -1,46 +1,42 @@
 GradientCalculation <- function(object){
   neurons <- object$neurons
   weights <- object$weights
+  act.deriv <- object$act.deriv 
   bias <- object$bias
-  y.result <- neurons[[length(neurons)]]
-  y <- object$data[,ncol(object$data)]
-  error <- object$err.fct(y.result, y)
-  
-  output.gradient <- attr(error,"gradient")[,1]
-  
-  temp.gradient <- output.gradient
   
   weights.gradient <- list()
-  neurons.gradient <- list()
   
+  layer.num <- object$layer.num
   output.layer.indx <- length(object$layer.num)
-  output.act.deriv <- attr(neurons[[output.layer.indx]],"gradient")
+  output.act.deriv <- act.deriv[[output.layer.indx]]
   error.deriv <- attr(object$metric,"gradient")[,"x"]
   if(is.null(output.act.deriv))
     output.act.deriv <- 1
-  neurons.gradient[[output.layer.indx]] <- output.act.deriv * error.deriv
+  neurons.gradient <- output.act.deriv * error.deriv
+  neurons.gradient <- as.matrix(neurons.gradient, ncol = layer.num[layer.indx + 1])
   
   for(layer.indx in length(weights):1){
 
     # to neuron gradient
-    temp.gradient <- as.matrix(neurons.gradient[[layer.indx+1]], ncol = object$layer.num[layer.indx + 1])
     bias.matrix <- matrix(1, nrow = nrow(object$data), ncol = bias[layer.indx])
     # output
-    output <- neurons[[layer.indx]]
+    output <- cbind(neurons[[layer.indx]], bias.matrix)
 
-    weights.gradient[[layer.indx]] <- rbind(crossprod(output, temp.gradient), t(crossprod(temp.gradient, bias.matrix)))
+    weights.gradient[[layer.indx]] <- crossprod(output, neurons.gradient)
+    
+    rownames(weights.gradient[[layer.indx]]) <- c(paste("FROM", 1:layer.num[layer.indx], sep = '_'),paste("BIAS", 1:bias[layer.indx], sep = '_'))
+    colnames(weights.gradient[[layer.indx]]) <- paste("TO", 1:layer.num[layer.indx+1], sep = '_')
     
     if(layer.indx != 1){
-      act.deriv <- matrix(attr(neurons[[layer.indx]],"gradient"), nrow = nrow(object$data))
+      act.deriv.temp <- matrix(act.deriv[[layer.indx]], ncol = layer.num[layer.indx])
       
       weights.temp <- weights[[layer.indx]]
-      weights.temp <- weights.temp[1:ncol(act.deriv),]
+      weights.temp <- weights.temp[1:layer.num[layer.indx],]
       
-      neurons.gradient[[layer.indx]] <- temp.gradient %*% weights.temp * act.deriv
+      neurons.gradient <- act.deriv.temp * tcrossprod(temp.gradient, weights.temp)
     }
   }
   
-  object$neurons_gradient <- neurons.gradient
   object$weights_gradient <- weights.gradient
   
   object

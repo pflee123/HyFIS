@@ -1,25 +1,47 @@
-InitializeFunction <- function (act.fct, err.fct, layer.num) {
+InitializeFunction <- function (act.fct, err.fct, layer.num, output.fct = NULL) {
     
   act.fct.layer <- list()
-  indx <- 1
-  for(act.fct.indx in act.fct){
-    if(act.fct.indx == "tanh"){
+  
+  for(indx in 1:length(layer.num)){
+    
+    if(indx == 1){
       act.fct.indx <- function(x){
-        tanh(x)
+        x
       }
-    }
-    if(act.fct.indx == "logistic"){
-      act.fct.indx <- function(x){
-        1/(1 + exp(-x))
+    }else if(indx == length(layer.num)){
+      if(is.null(output.fct)){
+        act.fct.indx <- function(x){
+          x
+        }
+      }else if(is.function(output.fct)){
+        act.fct.indx <- output.fct
+      }else if(output.fct == "tanh"){
+        act.fct.indx <- function(x){
+          tanh(x)
+        }
+      }else if(output.fct == "logistic"){
+        act.fct.indx <- function(x){
+          1/(1 + exp(-x))
+        }
       }
-    }
-    if (is.function(act.fct.indx)) {
-      act.fct.indx <- differentiate(act.fct.indx)
-      attr(act.fct.indx, "type") <- "activation"
+    }else{
+      if(is.function(act.fct[indx-1])){
+        act.fct.indx <- act.fct[indx-1] 
+      }else if(act.fct[indx-1] == "tanh"){
+        act.fct.indx <- function(x){
+          tanh(x)
+        }
+      }else if(act.fct[indx-1] == "logistic"){
+        act.fct.indx <- function(x){
+          1/(1 + exp(-x))
+        }
+      }
     }
     
+    act.fct.indx <- differentiate(act.fct.indx)
+    attr(act.fct.indx, "type") <- "activation"
+  
     act.fct.layer[[indx]] <- act.fct.indx
-    indx <- indx + 1
   }
   if(err.fct == "sse"){
     err.fct <- function(x, y){
@@ -31,8 +53,7 @@ InitializeFunction <- function (act.fct, err.fct, layer.num) {
     attr(err.fct, "type") <- "metric"
   }
   
-  act.fct <- rep_len(act.fct.layer, length.out = length(layer.num)-2)
-  return(list(err.fct = err.fct, act.fct = act.fct))
+  return(list(err.fct = err.fct, act.fct = act.fct.layer))
 }
 
 #' @param exclude triple element{layer.num, row.num(from), col.num(to)}
