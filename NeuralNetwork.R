@@ -49,46 +49,18 @@ neuralnet <- function (formula, data, hidden = 1, threshold = 0.01, stepmax = 1e
       object <- result$object
       result <- result$result
       
-      rmse <- sqrt(mean(2*object$metric))
+      rmse <- sqrt(mean(object$error_vector^2))
       
-      if(threshold >= rmse || abs(rmse - rmse.old) <= 0.0001)
+      if(is.nan(rmse) || threshold >= rmse || abs(rmse - rmse.old) <= 0.0001)
         break
       object <- GradientCalculation(object)
       object <- Backpropagation(object)
       
       rmse.old <- rmse
+      
+      print(rmse)
     }
-    # result <- calculate.neuralnet(learningrate.limit = learningrate.limit,
-    #                               learningrate.factor = learningrate.factor, covariate = data[,-ncol(data)],
-    #                               response = data[,ncol(data)], data = data, model.list = model.list,
-    #                               threshold = threshold, lifesign.step = lifesign.step,
-    #                               stepmax = stepmax, hidden = hidden, lifesign = lifesign,
-    #                               startweights = startweights, algorithm = algorithm,
-    #                               err.fct = err.fct, err.deriv.fct = err.deriv.fct,
-    #                               act.fct = act.fct, act.deriv.fct = act.deriv.fct,
-    #                               rep = i, linear.output = linear.output, exclude = exclude,
-    #                               constant.weights = constant.weights, likelihood = likelihood,
-    #                               learningrate.bp = learningrate.bp)
-    # 
-    # if (!is.null(matrix)) {
-    #   weight.count <- length(unlist(list.result[[1]]$weights)) - 
-    #     length(exclude) + length(constant.weights) - sum(constant.weights == 
-    #                                                        0)
-    #   if (!is.null(startweights) && length(startweights) < 
-    #       (rep * weight.count)) {
-    #     warning("some weights were randomly generated, because 'startweights' did not contain enough values", 
-    #             call. = F)
-    #   }
-    #   ncol.matrix <- ncol(matrix)
-    # }
-    # else ncol.matrix <- 0
-    # if (ncol.matrix < rep) 
-    #   warning(sprintf("algorithm did not converge in %s of %s repetition(s) within the stepmax", 
-    #                   (rep - ncol.matrix), rep), call. = FALSE)
-    # nn <- generate.output(covariate, call, rep, threshold, matrix, 
-    #                       startweights, model.list, response, err.fct, act.fct, 
-    #                       data, list.result, linear.output, exclude)
-    return(nn)
+    return(object)
   }
 
 varify.variables <-
