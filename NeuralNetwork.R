@@ -53,6 +53,8 @@ neuralnet <- function (formula, data, hidden = 1, threshold = 0.01, stepmax = 1e
       
       if(is.nan(rmse) || threshold >= rmse || abs(rmse - rmse.old) <= 0.0001)
         break
+      else
+        object.output <- object
       object <- GradientCalculation(object)
       object <- Backpropagation(object)
       
@@ -60,7 +62,7 @@ neuralnet <- function (formula, data, hidden = 1, threshold = 0.01, stepmax = 1e
       
       print(rmse)
     }
-    return(object)
+    return(object.output)
   }
 
 varify.variables <-
