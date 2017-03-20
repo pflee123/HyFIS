@@ -13,10 +13,10 @@ GradientCalculation <- function(object){
   if(is.null(output.act.deriv))
     output.act.deriv <- 1
   neurons.gradient <- output.act.deriv * error.deriv
-  neurons.gradient <- as.matrix(neurons.gradient, ncol = layer.num[layer.indx + 1])
   
-  for(layer.indx in length(weights):1){
+  # for(layer.indx in length(weights):1){
 
+  layer.indx <- length(weights)
     # to neuron gradient
     bias.matrix <- matrix(1, nrow = nrow(object$data), ncol = bias[layer.indx])
     # output
@@ -28,14 +28,15 @@ GradientCalculation <- function(object){
     colnames(weights.gradient[[layer.indx]]) <- paste("TO", 1:layer.num[layer.indx+1], sep = '_')
     
     if(layer.indx != 1){
-      act.deriv.temp <- matrix(act.deriv[[layer.indx]], ncol = layer.num[layer.indx])
+      # act.deriv.temp <- matrix(act.deriv[[layer.indx]], ncol = layer.num[layer.indx])
+      act.deriv.temp <- act.deriv[[layer.indx]]
       
       weights.temp <- weights[[layer.indx]]
       weights.temp <- weights.temp[1:layer.num[layer.indx],]
       
-      neurons.gradient <- act.deriv.temp * tcrossprod(temp.gradient, weights.temp)
+      neurons.gradient <- act.deriv.temp * tcrossprod(neurons.gradient, weights.temp)
     }
-  }
+  # }
   
   object$weights_gradient <- weights.gradient
   
@@ -49,10 +50,12 @@ Backpropagation <- function(object){
   
   if(is.null(object$learningrate))
     object$learningrate <- 1
-  for(indx in 1:length(object$weights)){
-    object$weights[[indx]] <- object$weights[[indx]] - object$weights_gradient[[indx]] * object$learningrate
-  }
   
   object$old_gradients <- object$weights_gradient
+  for(indx in 1:length(object$weights)){
+    if(!is.null(object$weights_gradient[[indx]]))
+      object$weights[[indx]] <- object$weights[[indx]] - object$weights_gradient[[indx]] * object$learningrate
+  }
+  
   object
 }

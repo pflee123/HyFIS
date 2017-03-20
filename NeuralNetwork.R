@@ -43,6 +43,9 @@ neuralnet <- function (formula, data, hidden = 1, threshold = 0.01, stepmax = 1e
     object <- NeuralNetwork(data, call, layer.num, weights, bias, model.list, err.fct, act.fct, exclude, learningrate)
     
     rmse.old <- 10000
+    record.weights <- NULL
+    record.gradient <- NULL
+    
     for(stemp in 1:stepmax){
       result <- Prediction(object, data[,-ncol(data)])
       
@@ -51,17 +54,23 @@ neuralnet <- function (formula, data, hidden = 1, threshold = 0.01, stepmax = 1e
       
       rmse <- sqrt(mean(object$error_vector^2))
       
-      if(is.nan(rmse) || threshold >= rmse || abs(rmse - rmse.old) <= 0.0001)
+      if(is.infinite(rmse) || is.nan(rmse) || threshold >= rmse || abs(rmse - rmse.old) <= 0.0001)
         break
       else
         object.output <- object
       object <- GradientCalculation(object)
+      
+      record.gradient <- rbind(record.gradient, unlist(object$weights_gradient))
+      record.weights <- rbind(record.weights, unlist(object$weights))
       object <- Backpropagation(object)
       
       rmse.old <- rmse
       
       print(rmse)
     }
+    
+    View(record.gradient)
+    View(record.weights)
     return(object.output)
   }
 
